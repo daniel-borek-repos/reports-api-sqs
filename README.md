@@ -1,8 +1,8 @@
 # SonarQube Server Quality Report Generator
 
-Fetches issue metrics from a SonarQube Server instance and generates a quality report as a PDF or HTML file.
+Fetches software quality metrics from a SonarQube Server instance and generates a quality report as a PDF or HTML file.
 
-Issues are retrieved via `api/issues/search` using type facets (BUG, VULNERABILITY, CODE_SMELL), making the data collection efficient regardless of project size. Lines of code are fetched separately via `api/measures/component`.
+Metrics are retrieved via `api/measures/component` using the `software_quality_*` metric keys introduced in SonarQube 10 (MQR mode). Projects are enumerated via `api/projects/search` with pagination.
 
 ## Prerequisites
 
@@ -49,7 +49,7 @@ Edit `endpoint.json`:
 }
 ```
 
-The `endpoint_url` must not have a trailing slash. The client appends API paths such as `/api/issues/search` directly to it.
+The `endpoint_url` must not have a trailing slash. The client appends API paths such as `/api/projects/search` directly to it.
 
 For test mode, copy and edit `test.json.sample`:
 
@@ -80,7 +80,7 @@ This produces:
 
 ### Stage 1 — Collect data from SonarQube Server
 
-Fetches all projects and their issue counts, then writes a timestamped CSV to `outputs/`.
+Fetches all projects and their software quality metrics, then writes a timestamped CSV to `outputs/`.
 
 ```bash
 java -jar target/reports-api-sqs-1.0-SNAPSHOT.jar
@@ -94,7 +94,7 @@ java -jar target/reports-api-sqs-1.0-SNAPSHOT.jar -t
 
 Output: `outputs/yyyyMMdd_HHmmss.csv`
 
-CSV columns: `project_key, project_name, bugs, vulnerabilities, code_smells, ncloc`
+CSV columns: `project_key, project_name, security_issues, reliability_issues, maintainability_issues, ncloc, lines`
 
 ### Stage 2 — Generate a report
 
@@ -131,11 +131,11 @@ Output files are written alongside the CSV with the same base name, e.g. `output
 
 Both PDF and HTML reports include:
 
-- Summary stat cards — project count, total issues, vulnerabilities, lines of code
-- Horizontal bar chart — top 30 projects by total issue count, broken down by Bugs / Vulnerabilities / Code Smells
+- Summary stat cards — project count, total issues, security issues, lines of code
+- Horizontal bar chart — top 30 projects by total issue count, broken down by Security Issues / Reliability Issues / Maintainability Issues
 
 The HTML report additionally supports:
 
 - **Tooltips** — hover over any bar to see exact values for all three issue types
-- **Issue type filter** — checkboxes to show/hide Bugs, Vulnerabilities, or Code Smells
+- **Issue type filter** — checkboxes to show/hide Security, Reliability, or Maintainability issues
 - **Project search** — text filter to narrow down projects shown in the chart

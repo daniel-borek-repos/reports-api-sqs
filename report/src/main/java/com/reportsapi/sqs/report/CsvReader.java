@@ -18,14 +18,15 @@ public class CsvReader {
             while ((line = br.readLine()) != null) {
                 if (line.isBlank()) continue;
                 String[] cols = parseLine(line);
-                if (cols.length < 6) continue;
+                if (cols.length < 7) continue;
                 CsvRecord r = new CsvRecord();
                 r.setProjectKey(cols[0]);
                 r.setProjectName(cols[1]);
-                r.setBugs(parseInt(cols[2]));
-                r.setVulnerabilities(parseInt(cols[3]));
-                r.setCodeSmells(parseInt(cols[4]));
+                r.setSecurityIssues(parseInt(cols[2]));
+                r.setReliabilityIssues(parseInt(cols[3]));
+                r.setMaintainabilityIssues(parseInt(cols[4]));
                 r.setNcloc(parseInt(cols[5]));
+                r.setLines(parseInt(cols[6]));
                 records.add(r);
             }
         }

@@ -1,6 +1,7 @@
 package com.reportsapi.sqs.client;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.reportsapi.sqs.model.EndpointConfig;
 import com.reportsapi.sqs.model.Project;
@@ -13,6 +14,12 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class SonarQubeClient {
+
+    private static final String METRIC_KEYS =
+            "software_quality_security_issues," +
+            "software_quality_reliability_issues," +
+            "software_quality_maintainability_issues," +
+            "ncloc,lines";
 
     private final EndpointConfig config;
     private final HttpClient httpClient;
@@ -51,54 +58,53 @@ public class SonarQubeClient {
     }
 
     /**
-     * Returns issue counts for a project by type (BUG, VULNERABILITY, CODE_SMELL)
-     * using the facets feature of api/issues/search — no need to page through all issues.
+     * Fetches software quality metrics for a project via api/measures/component.
+     * Handles both plain integer values and JSON-object values (e.g. {"total":5,"HIGH":2,...})
+     * returned by SonarQube 10+ in MQR mode.
      */
-    public IssueCounts fetchIssueCounts(String projectKey) throws Exception {
-        String url = config.getEndpointUrl()
-                + "/api/issues/search"
-                + "?componentKeys=" + projectKey
-                + "&types=BUG,VULNERABILITY,CODE_SMELL"
-                + "&resolved=false"
-                + "&ps=1"
-                + "&facets=types";
-
-        IssuesResponse response = objectMapper.readValue(get(url), IssuesResponse.class);
-
-        IssueCounts counts = new IssueCounts();
-        if (response.facets != null) {
-            for (Facet facet : response.facets) {
-                if ("types".equals(facet.property) && facet.values != null) {
-                    for (FacetValue fv : facet.values) {
-                        switch (fv.val) {
-                            case "BUG"           -> counts.bugs           = fv.count;
-                            case "VULNERABILITY" -> counts.vulnerabilities = fv.count;
-                            case "CODE_SMELL"    -> counts.codeSmells     = fv.count;
-                            default              -> { /* ignore */ }
-                        }
-                    }
-                }
-            }
-        }
-        return counts;
-    }
-
-    /** Returns non-comment lines of code for a project via api/measures/component. */
-    public int fetchNcloc(String projectKey) throws Exception {
+    public ProjectMeasures fetchMeasures(String projectKey) throws Exception {
         String url = config.getEndpointUrl()
                 + "/api/measures/component"
                 + "?component=" + projectKey
-                + "&metricKeys=ncloc";
+                + "&metricKeys=" + METRIC_KEYS;
 
         MeasuresResponse response = objectMapper.readValue(get(url), MeasuresResponse.class);
+
+        ProjectMeasures pm = new ProjectMeasures();
         if (response.component != null && response.component.measures != null) {
             for (Measure m : response.component.measures) {
-                if ("ncloc".equals(m.metric)) {
-                    try { return Integer.parseInt(m.value); } catch (NumberFormatException e) { return 0; }
+                int val = extractInt(m.value);
+                switch (m.metric) {
+                    case "software_quality_security_issues"        -> pm.securityIssues        = val;
+                    case "software_quality_reliability_issues"     -> pm.reliabilityIssues     = val;
+                    case "software_quality_maintainability_issues" -> pm.maintainabilityIssues = val;
+                    case "ncloc"                                   -> pm.ncloc                 = val;
+                    case "lines"                                   -> pm.lines                 = val;
+                    default -> { /* ignore */ }
                 }
             }
         }
-        return 0;
+        return pm;
+    }
+
+    /**
+     * Parses a metric value string that may be either a plain integer ("42")
+     * or a JSON object with a "total" field ({"total":42,"HIGH":10,"MEDIUM":20,"LOW":12}).
+     */
+    private static int extractInt(String value) {
+        if (value == null || value.isBlank()) return 0;
+        String v = value.trim();
+        if (v.startsWith("{")) {
+            try {
+                JsonNode node = new ObjectMapper().readTree(v);
+                JsonNode total = node.get("total");
+                return total != null ? total.asInt() : 0;
+            } catch (Exception e) {
+                return 0;
+            }
+        }
+        try { return Integer.parseInt(v); }
+        catch (NumberFormatException e) { return 0; }
     }
 
     private String get(String url) throws Exception {
@@ -117,13 +123,17 @@ public class SonarQubeClient {
         return response.body();
     }
 
-    // ── Inner response/model types ────────────────────────────────────────────
+    // ── Public result type ────────────────────────────────────────────────────
 
-    public static class IssueCounts {
-        public int bugs;
-        public int vulnerabilities;
-        public int codeSmells;
+    public static class ProjectMeasures {
+        public int securityIssues;
+        public int reliabilityIssues;
+        public int maintainabilityIssues;
+        public int ncloc;
+        public int lines;
     }
+
+    // ── Inner response types ──────────────────────────────────────────────────
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     private static class ProjectsResponse {
@@ -136,23 +146,6 @@ public class SonarQubeClient {
         public int pageIndex;
         public int pageSize;
         public int total;
-    }
-
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    private static class IssuesResponse {
-        public List<Facet> facets;
-    }
-
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    private static class Facet {
-        public String property;
-        public List<FacetValue> values;
-    }
-
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    private static class FacetValue {
-        public String val;
-        public int count;
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)

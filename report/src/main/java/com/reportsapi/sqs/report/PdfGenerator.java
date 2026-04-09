@@ -40,9 +40,9 @@ public class PdfGenerator {
     private static final float CW = W - 2 * M;
 
     private static final Color C_HEADER  = new Color(44,  62,  80);
-    private static final Color C_BUGS    = new Color(230, 126, 34);
-    private static final Color C_VULN    = new Color(231, 76,  60);
-    private static final Color C_SMELLS  = new Color(52,  152, 219);
+    private static final Color C_SECURITY = new Color(230, 126, 34);
+    private static final Color C_RELIAB   = new Color(231, 76,  60);
+    private static final Color C_MAINT    = new Color(52,  152, 219);
     private static final Color C_PLOT_BG = new Color(248, 249, 250);
     private static final Color C_GRID    = new Color(210, 215, 220);
     private static final Color C_SUBTEXT = new Color(150, 170, 190);
@@ -52,7 +52,7 @@ public class PdfGenerator {
     public static void generate(List<CsvRecord> records, File out) throws Exception {
         List<CsvRecord> top = records.stream()
                 .sorted(Comparator.comparingInt(r ->
-                        -(r.getBugs() + r.getVulnerabilities() + r.getCodeSmells())))
+                        -(r.getSecurityIssues() + r.getReliabilityIssues() + r.getMaintainabilityIssues())))
                 .limit(TOP_N)
                 .collect(Collectors.toList());
 
@@ -70,10 +70,10 @@ public class PdfGenerator {
         PDPage page = new PDPage(PDRectangle.A4);
         doc.addPage(page);
 
-        long totBugs   = all.stream().mapToLong(CsvRecord::getBugs).sum();
-        long totVuln   = all.stream().mapToLong(CsvRecord::getVulnerabilities).sum();
-        long totSmells = all.stream().mapToLong(CsvRecord::getCodeSmells).sum();
-        long totNcloc  = all.stream().mapToLong(CsvRecord::getNcloc).sum();
+        long totSecurity = all.stream().mapToLong(CsvRecord::getSecurityIssues).sum();
+        long totReliab   = all.stream().mapToLong(CsvRecord::getReliabilityIssues).sum();
+        long totMaint    = all.stream().mapToLong(CsvRecord::getMaintainabilityIssues).sum();
+        long totNcloc    = all.stream().mapToLong(CsvRecord::getNcloc).sum();
 
         float headerH = 75f;
         float cardGap = 10f;
@@ -97,11 +97,11 @@ public class PdfGenerator {
                     bold, regular, new Color(52, 73, 94));
             cx += cardW + cardGap;
             drawCard(cs, cx, cardsY, cardW, cardH,
-                    "Total Issues", fmtLong(totBugs + totVuln + totSmells),
+                    "Total Issues", fmtLong(totSecurity + totReliab + totMaint),
                     bold, regular, new Color(142, 68, 173));
             cx += cardW + cardGap;
             drawCard(cs, cx, cardsY, cardW, cardH,
-                    "Vulnerabilities", fmtLong(totVuln),
+                    "Security Issues", fmtLong(totSecurity),
                     bold, regular, new Color(192, 57, 43));
             cx += cardW + cardGap;
             drawCard(cs, cx, cardsY, cardW, cardH,
@@ -125,14 +125,14 @@ public class PdfGenerator {
         DefaultCategoryDataset ds = new DefaultCategoryDataset();
         for (CsvRecord r : projects) {
             String name = shorten(r.getProjectName() != null ? r.getProjectName() : r.getProjectKey(), 36);
-            ds.addValue(r.getBugs(),             "Bugs",             name);
-            ds.addValue(r.getVulnerabilities(),  "Vulnerabilities",  name);
-            ds.addValue(r.getCodeSmells(),       "Code Smells",      name);
+            ds.addValue(r.getSecurityIssues(),        "Security Issues",        name);
+            ds.addValue(r.getReliabilityIssues(),     "Reliability Issues",     name);
+            ds.addValue(r.getMaintainabilityIssues(), "Maintainability Issues", name);
         }
         return styleChart(
                 ChartFactory.createBarChart(null, null, "Issues",
                         ds, PlotOrientation.HORIZONTAL, true, false, false),
-                new Color[]{C_BUGS, C_VULN, C_SMELLS});
+                new Color[]{C_SECURITY, C_RELIAB, C_MAINT});
     }
 
     private static JFreeChart styleChart(JFreeChart chart, Color[] colors) {

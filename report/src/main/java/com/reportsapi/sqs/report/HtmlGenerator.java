@@ -14,21 +14,21 @@ public class HtmlGenerator {
     private HtmlGenerator() {}
 
     private static final String DIV_CLOSE = "</div>\n";
-    private static final String C_BUGS   = "#e67e22";
-    private static final String C_VULN   = "#e74c3c";
-    private static final String C_SMELLS = "#3498db";
+    private static final String C_SECURITY = "#e67e22";
+    private static final String C_RELIAB   = "#e74c3c";
+    private static final String C_MAINT    = "#3498db";
 
     private static final int TOP_N = 30;
 
     public static void generate(List<CsvRecord> records, File out) throws Exception {
-        long totBugs   = records.stream().mapToLong(CsvRecord::getBugs).sum();
-        long totVuln   = records.stream().mapToLong(CsvRecord::getVulnerabilities).sum();
-        long totSmells = records.stream().mapToLong(CsvRecord::getCodeSmells).sum();
-        long totNcloc  = records.stream().mapToLong(CsvRecord::getNcloc).sum();
+        long totSecurity = records.stream().mapToLong(CsvRecord::getSecurityIssues).sum();
+        long totReliab   = records.stream().mapToLong(CsvRecord::getReliabilityIssues).sum();
+        long totMaint    = records.stream().mapToLong(CsvRecord::getMaintainabilityIssues).sum();
+        long totNcloc    = records.stream().mapToLong(CsvRecord::getNcloc).sum();
 
         List<CsvRecord> top = records.stream()
                 .sorted(Comparator.comparingInt(r ->
-                        -(r.getBugs() + r.getVulnerabilities() + r.getCodeSmells())))
+                        -(r.getSecurityIssues() + r.getReliabilityIssues() + r.getMaintainabilityIssues())))
                 .limit(TOP_N)
                 .collect(Collectors.toList());
 
@@ -56,17 +56,17 @@ public class HtmlGenerator {
         // Stat cards
         sb.append("<div class=\"cards\">\n");
         appendCard(sb, "Projects",        fmtLong(records.size()),              "#34495e");
-        appendCard(sb, "Total Issues",    fmtLong(totBugs + totVuln + totSmells), "#8e44ad");
-        appendCard(sb, "Vulnerabilities", fmtLong(totVuln),                     "#c0392b");
+        appendCard(sb, "Total Issues",     fmtLong(totSecurity + totReliab + totMaint), "#8e44ad");
+        appendCard(sb, "Security Issues",  fmtLong(totSecurity),                       "#c0392b");
         appendCard(sb, "Lines of Code",   fmtLong(totNcloc),                    "#27ae60");
         sb.append(DIV_CLOSE);
 
         // Issue type filter
         sb.append("<div class=\"filter-bar\">\n");
         sb.append("  <span class=\"filter-label\">Filter issue types:</span>\n");
-        appendCheckbox(sb, 0, C_BUGS,   "Bugs");
-        appendCheckbox(sb, 1, C_VULN,   "Vulnerabilities");
-        appendCheckbox(sb, 2, C_SMELLS, "Code Smells");
+        appendCheckbox(sb, 0, C_SECURITY, "Security Issues");
+        appendCheckbox(sb, 1, C_RELIAB,   "Reliability Issues");
+        appendCheckbox(sb, 2, C_MAINT,    "Maintainability Issues");
         sb.append(DIV_CLOSE);
 
         // Project search filter
@@ -138,12 +138,12 @@ public class HtmlGenerator {
                 .map(r -> shorten(r.getProjectName() != null ? r.getProjectName() : r.getProjectKey(), 40))
                 .collect(Collectors.toList());
         appendJsStringList(sb, names);
-        sb.append("], bugs:[");
-        appendIntList(sb, projects.stream().map(r -> (long) r.getBugs()).collect(Collectors.toList()));
-        sb.append("], vulnerabilities:[");
-        appendIntList(sb, projects.stream().map(r -> (long) r.getVulnerabilities()).collect(Collectors.toList()));
-        sb.append("], codeSmells:[");
-        appendIntList(sb, projects.stream().map(r -> (long) r.getCodeSmells()).collect(Collectors.toList()));
+        sb.append("], securityIssues:[");
+        appendIntList(sb, projects.stream().map(r -> (long) r.getSecurityIssues()).collect(Collectors.toList()));
+        sb.append("], reliabilityIssues:[");
+        appendIntList(sb, projects.stream().map(r -> (long) r.getReliabilityIssues()).collect(Collectors.toList()));
+        sb.append("], maintainabilityIssues:[");
+        appendIntList(sb, projects.stream().map(r -> (long) r.getMaintainabilityIssues()).collect(Collectors.toList()));
         sb.append("] };\n\n");
 
         sb.append("const chart = new Chart(document.getElementById('projectChart'), {\n");
@@ -151,12 +151,12 @@ public class HtmlGenerator {
         sb.append("  data: {\n");
         sb.append("    labels: allData.labels.slice(),\n");
         sb.append("    datasets: [\n");
-        sb.append("      { label:'Bugs',            backgroundColor:'").append(C_BUGS)
-          .append("', data:allData.bugs.slice() },\n");
-        sb.append("      { label:'Vulnerabilities', backgroundColor:'").append(C_VULN)
-          .append("', data:allData.vulnerabilities.slice() },\n");
-        sb.append("      { label:'Code Smells',     backgroundColor:'").append(C_SMELLS)
-          .append("', data:allData.codeSmells.slice() }\n");
+        sb.append("      { label:'Security Issues',        backgroundColor:'").append(C_SECURITY)
+          .append("', data:allData.securityIssues.slice() },\n");
+        sb.append("      { label:'Reliability Issues',     backgroundColor:'").append(C_RELIAB)
+          .append("', data:allData.reliabilityIssues.slice() },\n");
+        sb.append("      { label:'Maintainability Issues', backgroundColor:'").append(C_MAINT)
+          .append("', data:allData.maintainabilityIssues.slice() }\n");
         sb.append("    ]\n  },\n");
         sb.append("  options: makeOptions()\n});\n");
 
@@ -175,9 +175,9 @@ public class HtmlGenerator {
                "    if (allData.labels[i].toLowerCase().indexOf(lower) !== -1) indices.push(i);\n" +
                "  }\n" +
                "  chart.data.labels               = indices.map(function(i) { return allData.labels[i]; });\n" +
-               "  chart.data.datasets[0].data     = indices.map(function(i) { return allData.bugs[i]; });\n" +
-               "  chart.data.datasets[1].data     = indices.map(function(i) { return allData.vulnerabilities[i]; });\n" +
-               "  chart.data.datasets[2].data     = indices.map(function(i) { return allData.codeSmells[i]; });\n" +
+               "  chart.data.datasets[0].data     = indices.map(function(i) { return allData.securityIssues[i]; });\n" +
+               "  chart.data.datasets[1].data     = indices.map(function(i) { return allData.reliabilityIssues[i]; });\n" +
+               "  chart.data.datasets[2].data     = indices.map(function(i) { return allData.maintainabilityIssues[i]; });\n" +
                "  var newH = Math.max(300, indices.length * 32 + 80);\n" +
                "  document.getElementById('chartWrap').style.height = newH + 'px';\n" +
                "  chart.update();\n" +

@@ -17,7 +17,7 @@ import java.util.List;
 public class Main {
 
     private static final DateTimeFormatter TIMESTAMP_FORMAT = DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss");
-    private static final String CSV_HEADER = "project_key,project_name,bugs,vulnerabilities,code_smells,ncloc";
+    private static final String CSV_HEADER = "project_key,project_name,security_issues,reliability_issues,maintainability_issues,ncloc,lines";
 
     public static void main(String[] args) throws Exception {
         File configFile = new File("endpoint.json");
@@ -81,15 +81,15 @@ public class Main {
 
     private static void writeRow(BufferedWriter csv, SonarQubeClient client,
                                   String projectKey, String projectName) throws Exception {
-        SonarQubeClient.IssueCounts issues = client.fetchIssueCounts(projectKey);
-        int ncloc = client.fetchNcloc(projectKey);
+        SonarQubeClient.ProjectMeasures m = client.fetchMeasures(projectKey);
 
         csv.write(escapeCsv(projectKey) + ","
                 + escapeCsv(projectName) + ","
-                + issues.bugs + ","
-                + issues.vulnerabilities + ","
-                + issues.codeSmells + ","
-                + ncloc);
+                + m.securityIssues + ","
+                + m.reliabilityIssues + ","
+                + m.maintainabilityIssues + ","
+                + m.ncloc + ","
+                + m.lines);
         csv.newLine();
     }
 
