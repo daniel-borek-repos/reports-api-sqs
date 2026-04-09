@@ -1,0 +1,5 @@
+{
+  "endpoint_url": "https://your-sonarqube-server",
+  "endpoint_name": "SonarQube Server",
+  "endpoint_token": "your-sonarqube-token-here"
+}

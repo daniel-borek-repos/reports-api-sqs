@@ -1,0 +1,7 @@
+endpoint.json
+test.json
+outputs/
+target/
+.claude/
+.vscode/
+dependency-reduced-pom.xml
